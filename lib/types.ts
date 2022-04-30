@@ -14,4 +14,12 @@ export interface IExtendedGridConfig extends IGridConfig {
     maxEqualCellsInLine: number;
 }
 
-export type IGridLine = ICell[];
+export type ILineData = ICell[];
+
+export type ILineType = 'row' | 'column';
+
+export type ILineNumber = number;
+
+export type ILineInfo = [ILineType, ILineNumber];
+
+export type ILineId = string;

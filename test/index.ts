@@ -1,8 +1,18 @@
 import { GameSolver } from "../lib/game-solver";
-import { primitiveGrid1 } from "./test-data";
+import { IGridConfig } from "../lib/types";
+import { drawGrid } from "../lib/visualizer";
+import { easyGrid1, primitiveGrid1 } from "./test-data";
 
-const game1 = new GameSolver(primitiveGrid1);
+solveGrid(easyGrid1);
 
-game1.solveGame();
 
-console.log(game1.solvedGrid);
+function solveGrid(gridConfig: IGridConfig): void {
+    console.log('Initial value:');
+    drawGrid(gridConfig.initialValue, gridConfig.size);
+    
+    const game1 = new GameSolver(gridConfig);
+    
+    console.log('Solved grid:');
+    const solvedGrid = game1.solveGame()
+    drawGrid(solvedGrid, gridConfig.size);
+}
