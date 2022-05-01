@@ -16,9 +16,29 @@ export class Utils {
         return [lineType, lineNumber];
     }
 
-    
+    public getOtherFilledLines(lineId: ILineId, grid: IGrid): ILineId[] {
+        const result: ILineId[] = [];
+        const linePreffix = lineId[0];
+        for (let i = 0; i < this.config.size; i++) {
+            const currLineId = `${linePreffix}${i}`;
+            const currLineData = this.getLineData(currLineId, grid);
+            if (currLineData.every(cell => cell !== null)) {
+                result.push(currLineId);
+            }
+        }
+        return result;
+    }
 
-    public getGridLine(lineId: ILineId, grid: IGrid): ILineData {
+    public isLinesPotentiallySame(filledLineId: ILineId, secondLineId: ILineId, grid: IGrid): boolean {
+        const filledLineData = this.getLineData(filledLineId, grid);
+        const secondLineData = this.getLineData(secondLineId, grid);
+
+        return secondLineData.every(
+            (cell, index) => cell === filledLineData[index] || cell === null
+        );
+    }
+
+    public getLineData(lineId: ILineId, grid: IGrid): ILineData {
         const lineInfo = this.getLineInfo(lineId);
         if (lineInfo[0] === 'row') {
             const row = lineInfo[1];
@@ -58,7 +78,7 @@ export class Utils {
     }
 
     public isLineComplete(line: ILineData): boolean {
-        if (!line.includes(null) || this.isLineValid(line)) return true;
+        if (!line.includes(null) && this.isLineValid(line)) return true;
         else return false;
     }
 
@@ -71,20 +91,21 @@ export class Utils {
     public isGridCompleteAndValid(grid: IGrid): boolean {
         const rows: ILineData[] = [], columns: ILineData[] = [];
         for (let lineNumber = 0; lineNumber < this.config.size; lineNumber++) {
-            rows.push(this.getGridLine(`r${lineNumber}`, grid));
-            columns.push(this.getGridLine(`c${lineNumber}`, grid));
+            rows.push(this.getLineData(`r${lineNumber}`, grid));
+            columns.push(this.getLineData(`c${lineNumber}`, grid));
         }
 
         const allRowsValid = rows.every((row, index) => {
-            const otherRows = [...rows].splice(index, 1);
+            const otherRows = [...rows];
+            otherRows.splice(index, 1);
             return this.isLineComplete(row) && this.isLineUnique(row, otherRows);
         });
 
         const allColumnsValid = columns.every((column, index) => {
-            const otherColumns = [...columns].splice(index, 1);
+            const otherColumns = [...columns];
+            otherColumns.splice(index, 1);
             return this.isLineComplete(column) && this.isLineUnique(column, otherColumns);
         });
-
         return allRowsValid && allColumnsValid;
     }
 
@@ -113,6 +134,18 @@ export class Utils {
         } else {
             return `c${cellNumber}`;
         }
+    }
+
+    public getUnsolvedLines(grid: IGrid): ILineId[] {
+        const result: ILineId[] = [];
+        for (let i = 0; i < this.config.size; i++) {
+            [`r${i}`, `c${i}`].forEach(lineId => {
+                const lineData = this.getLineData(lineId, grid);
+                const lineSolved = lineData.every(cell => cell !== null);
+                if (!lineSolved) result.push(lineId);
+            });
+        }
+        return result;
     }
 
     // PRIVATE

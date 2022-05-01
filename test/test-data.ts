@@ -6,9 +6,9 @@ import { IGridConfig } from "../lib/types";
 export const primitiveGrid1: IGridConfig = {
     size: 4,
     initialValue: {
-        '1x0': 1,
-        '2x1': 0,
-        '3x3': 0
+        '1x0': 0, '2x0': 0,
+        '0x1': 1, '2x1': 1,
+        '3x2': 0
     }
 };
 

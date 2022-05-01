@@ -1,6 +1,7 @@
 import { IExtendedGridConfig, IGrid, IGridConfig, ILineData, ILineId } from "./types";
 import { Utils } from "./utils";
 import { drawGrid } from "./visualizer";
+import { performance } from 'perf_hooks';
 
 interface LineCheckResult {
     isGameSolved: boolean;
@@ -29,12 +30,13 @@ export class GameSolver {
 
     public solveGame(): IGrid {
         let checkResult: LineCheckResult;
-        let totalTries = 0;
+        const solveStart = performance.now();
         do {
             checkResult = this.checkLines();
-            console.log(checkResult);
-            drawGrid(this.grid, this.utils.config.size);
-        } while(!(checkResult.isGameSolved || checkResult.isFailed || ++totalTries > 20))
+        } while(!(checkResult.isGameSolved || checkResult.isFailed))
+
+        const solvedIn = performance.now() - solveStart;
+        console.log('solved in', solvedIn, 'ms');
 
         if (checkResult.isFailed) {
             console.log('Couldn\'t solve the game');
@@ -44,7 +46,7 @@ export class GameSolver {
 
     private checkLines(): LineCheckResult {
         this.currentLinesToCheck.forEach(lineId => {
-            const lineData = this.utils.getGridLine(lineId, this.grid);
+            const lineData = this.utils.getLineData(lineId, this.grid);
             const result = this.partiallySolveLine(lineData, lineId);
 
             result.affectedLines.forEach(affectedLineId => {
@@ -57,7 +59,8 @@ export class GameSolver {
             return { isGameSolved: true, isFailed: false };
         } else {
             if (this.nextLinesToCheck.size === 0) {
-                return { isGameSolved: false, isFailed: true };
+                this.nextLinesToCheck = new Set(this.utils.getUnsolvedLines(this.grid));
+                // return { isGameSolved: false, isFailed: true };
             }
             this.currentLinesToCheck = new Set(this.nextLinesToCheck.values());
             this.nextLinesToCheck = new Set();
@@ -67,29 +70,36 @@ export class GameSolver {
     }
 
     private partiallySolveLine(lineData: ILineData, lineId: ILineId): { newLine: ILineData, affectedLines: ILineId[] } {
-        console.log(lineId);
         const affectedLines: ILineId[] = [];
         
         // Grid cannot have 3 equal cells in a line
-        lineData.forEach((currCell, currIndex) => {
-            if (currIndex - 1 < 0 || currIndex + 1 >= lineData.length) return;
-
-            const nextIndex = currIndex + 1;
-            const nextCell = lineData[nextIndex];
-            const prevIndex = currIndex - 1;
-            const prevCell = lineData[prevIndex];
-            
-            if (this.utils.isSameColor(currCell, nextCell) && prevCell === null) {
-                lineData[prevIndex] = this.utils.getOppositeColor(currCell);
-                affectedLines.push(this.utils.getAffectedLineId(lineId, prevIndex));
-            } else if (this.utils.isSameColor(prevCell, currCell) && nextCell === null) {
-                lineData[nextIndex] = this.utils.getOppositeColor(currCell);
-                affectedLines.push(this.utils.getAffectedLineId(lineId, nextIndex));
-            } else if (this.utils.isSameColor(prevCell, nextCell)  && currCell === null) {
-                lineData[currIndex] = this.utils.getOppositeColor(nextCell);
-                affectedLines.push(this.utils.getAffectedLineId(lineId, currIndex));
-            }
-        });
+        let lastTryWasSuccessful: boolean;
+        do {
+            lastTryWasSuccessful = false;
+            lineData.forEach((currCell, currIndex) => {
+                if (currIndex - 1 < 0 || currIndex + 1 >= lineData.length) return;
+    
+                const nextIndex = currIndex + 1;
+                const nextCell = lineData[nextIndex];
+                const prevIndex = currIndex - 1;
+                const prevCell = lineData[prevIndex];
+                
+                if (this.utils.isSameColor(currCell, nextCell) && prevCell === null) {
+                    lineData[prevIndex] = this.utils.getOppositeColor(currCell);
+                    affectedLines.push(this.utils.getAffectedLineId(lineId, prevIndex));
+                    lastTryWasSuccessful = true;
+                } else if (this.utils.isSameColor(prevCell, currCell) && nextCell === null) {
+                    lineData[nextIndex] = this.utils.getOppositeColor(currCell);
+                    affectedLines.push(this.utils.getAffectedLineId(lineId, nextIndex));
+                    lastTryWasSuccessful = true;
+                } else if (this.utils.isSameColor(prevCell, nextCell)  && currCell === null) {
+                    lineData[currIndex] = this.utils.getOppositeColor(nextCell);
+                    affectedLines.push(this.utils.getAffectedLineId(lineId, currIndex));
+                    lastTryWasSuccessful = true;
+                }
+            });
+        } while(lastTryWasSuccessful)
+        
 
         // Line already have maximum of one color
         const amountOfZeros = lineData.filter(cell => cell === 0).length;
@@ -111,8 +121,29 @@ export class GameSolver {
         }
 
         // Rule 3: All rows should be unique. The same for columns
-        // TODO
+        const amountOfNulls = lineData.filter(cell => cell === null).length;
+        if (amountOfNulls === 2) {
+            const otherLineIds = this.utils.getOtherFilledLines(lineId, this.grid);
+
+            for (let otherLineId of otherLineIds) {
+                if (this.utils.isLinesPotentiallySame(otherLineId, lineId, this.grid)) {
+                    const firstIndex = lineData.findIndex((cell) => cell === null);
+                    const secondIndex = lineData.findIndex((cell, index) => cell === null && firstIndex !== index);
+
+                    const filledLineData = this.utils.getLineData(otherLineId, this.grid);
+
+                    lineData[firstIndex] = filledLineData[secondIndex];
+                    lineData[secondIndex] = filledLineData[firstIndex];
+
+                    affectedLines.push(this.utils.getAffectedLineId(lineId, firstIndex));
+                    affectedLines.push(this.utils.getAffectedLineId(lineId, secondIndex));
+                    break;
+                }
+            }
+        }
 
         return { newLine: lineData, affectedLines };
     }
+
+    
 }
